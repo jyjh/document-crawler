@@ -1,0 +1,68 @@
+# Copy this file to config.yaml and adjust it for your server and folders.
+# Relative cache/log paths are resolved from this config file's directory.
+
+crawl:
+  directories:
+    - "D:\\Documents\PDFs"
+  extensions: [".pdf"]
+  recursive: true
+  exclude_dirs: []
+  max_file_size_mb: 500
+
+hash:
+  algorithm: sha256
+
+server:
+  base_url: "http://100.87.142.5:8000"
+  timeout_seconds: 30
+  verify_tls: true
+  ca_bundle: null
+  headers:
+    # ${API_TOKEN} and file:C:\path\to\token.txt are expanded once at load time.
+    # Authorization: "Bearer ${API_TOKEN}"
+    # Authorization: "Bearer file:C:\\secrets\\token.txt"
+
+check:
+  method: GET
+  url: "{base_url}/api/uploads/check-hash"
+  query:
+    hash: "{hash}"
+  # json_body:
+  #   hash: "{hash}"
+  detect:
+    mode: json_path
+    json_path: "exists"
+    json_path_truthy: true
+  on_unknown: error
+  retry_on: [5xx, timeout, connection_error]
+
+upload:
+  method: POST
+  url: "{base_url}/api/uploads/direct"
+  format: multipart
+  file_field: "file"
+  filename_template: "{filename}"
+  extra_fields:
+    hash: "{hash}"
+    filename: "{filename}"
+  detect:
+    mode: status_in
+    status_in: [200, 201, 202]
+  idempotent: false
+  retry_on: [5xx, timeout, connection_error]
+
+retry:
+  attempts: 3
+  backoff_seconds: 2
+
+server_unreachable: fail
+
+cache:
+  enabled: true
+  path: ".doc_crawler_cache.sqlite"
+  trust_size_mtime: true
+
+logging:
+  level: INFO
+  file: "logs/crawler.log"
+  console: true

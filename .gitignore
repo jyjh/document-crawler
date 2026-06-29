@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+.venv/
+venv/
+env/
+
+config.yaml
+logs/
+.doc_crawler_cache.sqlite
+.doc_crawler_cache.sqlite-*
+
+.coverage
+htmlcov/
+.pytest_cache/
+.tmp_tests/
