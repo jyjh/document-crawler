@@ -35,9 +35,14 @@ class CrawlerTests(unittest.TestCase):
                 max_file_size_mb=0.00001,
             )
 
-            paths = {Path(item.path).name for item in iter_files(crawl)}
+            with self.assertLogs("doc_crawler.crawler", level="INFO") as logs:
+                paths = {Path(item.path).name for item in iter_files(crawl)}
 
             self.assertEqual(paths, {"keep.pdf", "nested.PDF"})
+            output = "\n".join(logs.output)
+            self.assertIn("crawl_directory_searched", output)
+            self.assertIn("file_found", output)
+            self.assertIn("file_rejected", output)
 
     def test_non_recursive_only_reads_top_level(self) -> None:
         with temp_dir() as tmp:

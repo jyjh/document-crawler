@@ -107,6 +107,23 @@ class MainTests(unittest.TestCase):
             check.assert_not_called()
             upload.assert_not_called()
 
+    def test_upload_false_logs_rejected_and_counts_error(self) -> None:
+        with temp_dir() as tmp:
+            root = Path(tmp)
+            cfg = load_config(write_config(root))
+            files = [FoundFile(str(root / "rejected.pdf"), 1, 1.0)]
+
+            with mock.patch("doc_crawler.__main__.iter_files", return_value=iter(files)), \
+                mock.patch("doc_crawler.__main__.hash_file", return_value="digest"), \
+                mock.patch("doc_crawler.__main__.check_exists", return_value="missing"), \
+                mock.patch("doc_crawler.__main__.upload", return_value=False), \
+                self.assertLogs("doc_crawler.__main__", level="INFO") as logs:
+                stats = run(cfg)
+
+            self.assertEqual(stats.uploaded, 0)
+            self.assertEqual(stats.errors, 1)
+            self.assertIn("file_rejected", "\n".join(logs.output))
+
     def test_clean_run_exit_zero(self) -> None:
         with temp_dir() as tmp:
             root = Path(tmp)

@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from .api import (
     ApiError,
@@ -72,6 +73,7 @@ def run(cfg: AppConfig, *, dry_run: bool = False, limit: int | None = None, no_c
 
 
 def main(argv: list[str] | None = None) -> int:
+    launch_time = datetime.now(timezone.utc).isoformat()
     parser = argparse.ArgumentParser(prog="python -m doc_crawler")
     parser.add_argument("--config", required=True, help="Path to config.yaml")
     parser.add_argument("--dry-run", action="store_true", help="Hash and log planned work without API writes")
@@ -82,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = load_config(args.config)
         setup_logging(cfg.logging)
+        logger.info("application_launched launch_time=%s config=%s", launch_time, cfg.config_path)
         logger.info("run_started config=%s", cfg.config_path)
         stats = run(cfg, dry_run=args.dry_run, limit=args.limit, no_cache=args.no_cache)
         return EXIT_FILE_ERRORS if stats.errors else EXIT_OK
@@ -128,6 +131,7 @@ def _process_file(
             return
         if state == "skip":
             stats.skipped += 1
+            logger.info("file_rejected path=%s reason=remote_check_skipped", found.path)
             logger.warning("remote_check_skipped path=%s", found.path)
             return
 
@@ -136,24 +140,28 @@ def _process_file(
             cache.put(found, digest)
             logger.info("uploaded path=%s", found.path)
             return
+        logger.info("file_rejected path=%s reason=upload_response_rejected", found.path)
         raise ApiError("upload detection returned false")
     except PermissionError as exc:
         stats.skipped_locked += 1
         stats.errors += 1
+        logger.info("file_rejected path=%s reason=locked", found.path)
         logger.warning("skipped_locked path=%s error=%s", found.path, exc)
     except OSError as exc:
         stats.errors += 1
+        logger.info("file_rejected path=%s reason=file_error", found.path)
         logger.warning("file_error path=%s error=%s", found.path, exc)
     except TransientError as exc:
         if exc.kind in {"connection_error", "timeout"} and cfg.server_unreachable == "fail":
             raise ServerUnreachableError(str(exc)) from exc
         stats.errors += 1
+        logger.info("file_rejected path=%s reason=transient_error kind=%s", found.path, exc.kind)
         logger.warning("transient_file_error path=%s kind=%s error=%s", found.path, exc.kind, exc)
     except ApiError as exc:
         stats.errors += 1
+        logger.info("file_rejected path=%s reason=api_error", found.path)
         logger.warning("api_file_error path=%s error=%s", found.path, exc)
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

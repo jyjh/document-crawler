@@ -26,6 +26,7 @@ def iter_files(crawl: CrawlConfig) -> Iterator[FoundFile]:
 
     for root_text in _scan_roots(crawl):
         root = Path(root_text).expanduser()
+        logger.info("crawl_directory_searched path=%s recursive=%s", root, crawl.recursive)
         if not root.exists():
             logger.warning("crawl_directory_missing path=%s", root)
             continue
@@ -147,8 +148,10 @@ def _candidate(path: Path, extensions: set[str], max_size: int | None) -> FoundF
         logger.warning("stat_failed path=%s error=%s", path, exc)
         return None
     if max_size is not None and stat.st_size > max_size:
+        logger.info("file_rejected path=%s reason=too_large size=%s max=%s", path, stat.st_size, max_size)
         logger.info("skipped_too_large path=%s size=%s max=%s", path, stat.st_size, max_size)
         return None
+    logger.info("file_found path=%s size=%s mtime=%s", path, stat.st_size, stat.st_mtime)
     return FoundFile(path=str(path), size=stat.st_size, mtime=stat.st_mtime)
 
 
@@ -170,4 +173,3 @@ def _is_excluded(path: Path, excludes: tuple[str, ...]) -> bool:
         elif name == exclude_text:
             return True
     return False
-
