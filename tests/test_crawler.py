@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from doc_crawler.config import CrawlConfig
+from doc_crawler.config import CrawlConfig, DirectorySearch
 from doc_crawler.crawler import hash_file, iter_files
 from test_support import temp_dir
 
@@ -50,6 +50,62 @@ class CrawlerTests(unittest.TestCase):
             crawl = CrawlConfig(directories=(str(root),), extensions=(".pdf",), recursive=False)
 
             self.assertEqual([Path(item.path).name for item in iter_files(crawl)], ["top.pdf"])
+
+    def test_directory_search_scans_matched_folders_recursively(self) -> None:
+        import re
+
+        with temp_dir() as tmp:
+            parent = Path(tmp) / "library"
+            parent.mkdir()
+            (parent / "case-001").mkdir()
+            (parent / "case-001" / "a.pdf").write_bytes(b"a")
+            (parent / "case-001" / "sub").mkdir()
+            (parent / "case-001" / "sub" / "b.pdf").write_bytes(b"b")
+            (parent / "misc").mkdir()
+            (parent / "misc" / "ignore.pdf").write_bytes(b"i")
+            (parent / "case-002").mkdir()
+            (parent / "case-002" / "c.pdf").write_bytes(b"c")
+
+            crawl = CrawlConfig(
+                directories=(),
+                extensions=(".pdf",),
+                recursive=True,
+                directory_search=DirectorySearch(
+                    parent=str(parent),
+                    pattern=re.compile(r"case-\d+"),
+                ),
+            )
+
+            found = sorted(Path(item.path).name for item in iter_files(crawl))
+            self.assertEqual(found, ["a.pdf", "b.pdf", "c.pdf"])
+
+    def test_directory_search_non_recursive_only_matches_top_level(self) -> None:
+        import re
+
+        with temp_dir() as tmp:
+            parent = Path(tmp) / "library"
+            parent.mkdir()
+            (parent / "case-001").mkdir()
+            (parent / "case-001" / "a.pdf").write_bytes(b"a")
+            # A matching folder nested deeper should be ignored when
+            # directory_search.recursive is False.
+            (parent / "holder").mkdir()
+            (parent / "holder" / "case-002").mkdir()
+            (parent / "holder" / "case-002" / "c.pdf").write_bytes(b"c")
+
+            crawl = CrawlConfig(
+                directories=(),
+                extensions=(".pdf",),
+                recursive=True,
+                directory_search=DirectorySearch(
+                    parent=str(parent),
+                    pattern=re.compile(r"case-\d+"),
+                    recursive=False,
+                ),
+            )
+
+            found = sorted(Path(item.path).name for item in iter_files(crawl))
+            self.assertEqual(found, ["a.pdf"])
 
     def test_hash_file_streams_expected_digest(self) -> None:
         with temp_dir() as tmp:

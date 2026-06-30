@@ -36,12 +36,28 @@ class ConfigError(ValueError):
 
 
 @dataclass(frozen=True)
+class DirectorySearch:
+    """Find subdirectories under ``parent`` whose name matches ``pattern``.
+
+    The matched directories are scanned exactly like entries in
+    ``CrawlConfig.directories``. ``recursive`` controls whether the parent is
+    walked recursively while searching for matching folder names; the matched
+    folders themselves are always scanned using the crawl's normal settings.
+    """
+
+    parent: str
+    pattern: "re.Pattern[str]"
+    recursive: bool = True
+
+
+@dataclass(frozen=True)
 class CrawlConfig:
     directories: tuple[str, ...]
     extensions: tuple[str, ...]
     recursive: bool = True
     exclude_dirs: tuple[str, ...] = ()
     max_file_size_mb: int | None = None
+    directory_search: DirectorySearch | None = None
 
     @property
     def max_file_size_bytes(self) -> int | None:
@@ -206,9 +222,14 @@ def _section(data: Mapping[str, Any], name: str, *, required: bool = True) -> Ma
 
 
 def _load_crawl(data: Mapping[str, Any]) -> CrawlConfig:
+    directory_search = _load_directory_search(data.get("directory_search"))
+
     directories = _as_str_tuple(data.get("directories"), "crawl.directories")
-    if not directories:
-        raise ConfigError("crawl.directories must contain at least one directory")
+    if not directories and directory_search is None:
+        raise ConfigError(
+            "crawl.directories must contain at least one directory, "
+            "or crawl.directory_search must be configured"
+        )
 
     extensions = _as_str_tuple(data.get("extensions", [".pdf"]), "crawl.extensions")
     normalized_exts = []
@@ -233,6 +254,33 @@ def _load_crawl(data: Mapping[str, Any]) -> CrawlConfig:
         recursive=bool(data.get("recursive", True)),
         exclude_dirs=exclude_dirs,
         max_file_size_mb=int(max_file_size_mb) if max_file_size_mb is not None else None,
+        directory_search=directory_search,
+    )
+
+
+def _load_directory_search(data: Any) -> DirectorySearch | None:
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ConfigError("crawl.directory_search must be a mapping")
+
+    parent = data.get("parent")
+    if not parent:
+        raise ConfigError("crawl.directory_search.parent is required")
+
+    pattern_text = data.get("pattern")
+    if not pattern_text:
+        raise ConfigError("crawl.directory_search.pattern is required")
+
+    try:
+        pattern = re.compile(str(pattern_text))
+    except re.error as exc:
+        raise ConfigError(f"crawl.directory_search.pattern is not a valid regex: {exc}") from exc
+
+    return DirectorySearch(
+        parent=str(Path(str(parent)).expanduser()),
+        pattern=pattern,
+        recursive=bool(data.get("recursive", True)),
     )
 
 

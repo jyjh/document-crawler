@@ -8,6 +8,14 @@ crawl:
   recursive: true
   exclude_dirs: []
   max_file_size_mb: 500
+  # Optional: instead of (or in addition to) listing folders explicitly, search
+  # under a parent directory for subdirectories whose name matches a regex, then
+  # scan those matched folders for files. Both directories and directory_search
+  # may be used at the same time.
+  # directory_search:
+  #   parent: "D:\\Documents\\Projects"
+  #   pattern: "case-\\d+"   # any Python re pattern; matched with re.search
+  #   recursive: true        # walk parent recursively to find matching folders
 
 hash:
   algorithm: sha256

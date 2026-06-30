@@ -113,6 +113,56 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ConfigError, "Unknown placeholder"):
                 load_config(path)
 
+    def test_directory_search_loads_compiled_pattern(self) -> None:
+        with temp_dir() as tmp:
+            root = Path(tmp)
+            parent = root / "library"
+            parent.mkdir()
+            data = base_config(root)
+            data["crawl"]["directory_search"] = {
+                "parent": str(parent),
+                "pattern": r"case-\d+",
+            }
+            path = write_config(root, data)
+
+            cfg = load_config(path)
+
+            self.assertIsNotNone(cfg.crawl.directory_search)
+            assert cfg.crawl.directory_search is not None
+            self.assertEqual(cfg.crawl.directory_search.parent, str(parent))
+            self.assertEqual(cfg.crawl.directory_search.pattern.pattern, r"case-\d+")
+            self.assertTrue(cfg.crawl.directory_search.recursive)
+
+    def test_directory_search_invalid_regex_raises(self) -> None:
+        with temp_dir() as tmp:
+            root = Path(tmp)
+            data = base_config(root)
+            data["crawl"]["directory_search"] = {
+                "parent": str(root),
+                "pattern": r"([unclosed",
+            }
+            path = write_config(root, data)
+
+            with self.assertRaisesRegex(ConfigError, "not a valid regex"):
+                load_config(path)
+
+    def test_directory_search_missing_fields_raise(self) -> None:
+        with temp_dir() as tmp:
+            root = Path(tmp)
+            path = write_config(root, base_config(root) | {})
+
+            # No parent
+            data = base_config(root)
+            data["crawl"]["directory_search"] = {"pattern": r"x"}
+            with self.assertRaisesRegex(ConfigError, "parent is required"):
+                load_config(write_config(root, data))
+
+            # No pattern
+            data = base_config(root)
+            data["crawl"]["directory_search"] = {"parent": str(root)}
+            with self.assertRaisesRegex(ConfigError, "pattern is required"):
+                load_config(write_config(root, data))
+
 
 if __name__ == "__main__":
     unittest.main()

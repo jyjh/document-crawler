@@ -38,6 +38,22 @@ Useful options:
 
 Start from `config.example.yaml`. Relative paths for logs, cache, and CA bundles are resolved relative to the config file, not the current working directory. This avoids surprises when Windows Task Scheduler starts the process from another location.
 
+### Discovery
+
+`crawl.directories` lists explicit folders to scan. As an alternative (or in addition), `crawl.directory_search` walks a parent directory and scans any subdirectory whose name matches a regex pattern:
+
+```yaml
+crawl:
+  directories:
+    - "D:\\Documents\\PDFs"
+  directory_search:
+    parent: "D:\\Documents\\Projects"
+    pattern: "case-\\d+"   # any Python re pattern; matched with re.search
+    recursive: true        # walk parent recursively to find matching folders (default true)
+```
+
+Each matched folder is then scanned using the crawl's normal `extensions`, `recursive`, `exclude_dirs`, and `max_file_size_mb` settings. At least one of `directories` or `directory_search` is required.
+
 Load-time expansion:
 
 - `${ENV}` is replaced from the environment. Missing variables are config errors. Empty variables warn.

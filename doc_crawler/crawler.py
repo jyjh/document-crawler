@@ -24,7 +24,7 @@ def iter_files(crawl: CrawlConfig) -> Iterator[FoundFile]:
     extensions = {ext.lower() for ext in crawl.extensions}
     max_size = crawl.max_file_size_bytes
 
-    for root_text in crawl.directories:
+    for root_text in _scan_roots(crawl):
         root = Path(root_text).expanduser()
         if not root.exists():
             logger.warning("crawl_directory_missing path=%s", root)
@@ -34,6 +34,59 @@ def iter_files(crawl: CrawlConfig) -> Iterator[FoundFile]:
             yield from _iter_recursive(root, crawl, extensions, max_size)
         else:
             yield from _iter_single_dir(root, crawl, extensions, max_size)
+
+
+def _scan_roots(crawl: CrawlConfig) -> Iterator[str]:
+    """Yield the explicit crawl directories plus any regex-matched folders."""
+    yield from crawl.directories
+
+    search = crawl.directory_search
+    if search is None:
+        return
+
+    parent = Path(search.parent).expanduser()
+    if not parent.exists():
+        logger.warning("directory_search_parent_missing path=%s", parent)
+        return
+
+    logger.info(
+        "directory_search parent=%s pattern=%s recursive=%s",
+        parent,
+        search.pattern.pattern,
+        search.recursive,
+    )
+
+    if search.recursive:
+        yielded = False
+        for dirpath, dirnames, _filenames in os.walk(parent, topdown=True, followlinks=False):
+            current = Path(dirpath)
+            for name in list(dirnames):
+                if search.pattern.search(name):
+                    matched = current / name
+                    yielded = True
+                    logger.info("directory_search_matched path=%s", matched)
+                    yield str(matched)
+                    # Do not descend into a matched folder while searching; it
+                    # will be scanned separately using the crawl's own settings.
+                    dirnames.remove(name)
+        if not yielded:
+            logger.info("directory_search_no_matches parent=%s", parent)
+    else:
+        try:
+            with os.scandir(parent) as entries:
+                matched_dirs = [
+                    entry.path for entry in entries
+                    if entry.is_dir(follow_symlinks=False)
+                    and search.pattern.search(entry.name)
+                ]
+        except OSError as exc:
+            logger.warning("directory_search_scan_error path=%s error=%s", parent, exc)
+            return
+        for path in matched_dirs:
+            logger.info("directory_search_matched path=%s", path)
+            yield path
+        if not matched_dirs:
+            logger.info("directory_search_no_matches parent=%s", parent)
 
 
 def hash_file(path: str | os.PathLike[str], algo: str, chunk: int = 1 << 20) -> str:
