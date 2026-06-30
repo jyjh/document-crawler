@@ -12,21 +12,20 @@ Requirements:
 - Windows for the included Task Scheduler helper
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.txt
+python -m pip install -r requirements.txt
 Copy-Item config.example.yaml config.yaml
 ```
 
 Edit `config.yaml`, then run:
 
 ```powershell
-.\.venv\Scripts\python -m doc_crawler --config config.yaml --dry-run --limit 5
+python -m doc_crawler --config config.yaml --dry-run --limit 5
 ```
 
 Run for real:
 
 ```powershell
-.\.venv\Scripts\python -m doc_crawler --config config.yaml
+python -m doc_crawler --config config.yaml
 ```
 
 Useful options:
@@ -123,20 +122,19 @@ Per-file errors are logged and the run continues where possible. If `server_unre
 
 ## Windows Task Scheduler
 
-Create and activate a virtual environment first, then register the task:
+Register the task:
 
 ```powershell
 .\register_task.ps1 `
   -TaskName "DocumentCrawler" `
   -ConfigPath "C:\path\to\document-crawler\config.yaml" `
-  -PythonPath "C:\path\to\document-crawler\.venv\Scripts\pythonw.exe" `
   -At "02:00" `
   -User "DOMAIN\crawler-user"
 ```
 
 The registered task uses:
 
-- `pythonw.exe` to avoid a console window
+- `python` to run without depending on a virtual environment
 - the repo directory as the working directory
 - `MultipleInstances IgnoreNew` to prevent overlapping runs
 - `StartWhenAvailable` to catch missed schedules

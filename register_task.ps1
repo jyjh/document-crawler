@@ -1,7 +1,6 @@
 param(
     [string]$TaskName = "DocumentCrawler",
     [string]$ConfigPath = "$PSScriptRoot\config.yaml",
-    [string]$PythonPath = "$PSScriptRoot\.venv\Scripts\pythonw.exe",
     [string]$At = "02:00",
     [string]$User,
     [securestring]$Password
@@ -12,12 +11,8 @@ $ErrorActionPreference = "Stop"
 $installDir = Split-Path -Parent $PSCommandPath
 $resolvedConfig = (Resolve-Path -LiteralPath $ConfigPath).Path
 
-if (-not (Test-Path -LiteralPath $PythonPath)) {
-    throw "Python executable not found: $PythonPath"
-}
-
 $argument = "-m doc_crawler --config `"$resolvedConfig`""
-$action = New-ScheduledTaskAction -Execute $PythonPath -Argument $argument -WorkingDirectory $installDir
+$action = New-ScheduledTaskAction -Execute "python" -Argument $argument -WorkingDirectory $installDir
 $trigger = New-ScheduledTaskTrigger -Daily -At $At
 $settings = New-ScheduledTaskSettingsSet `
     -MultipleInstances IgnoreNew `
